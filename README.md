@@ -122,10 +122,15 @@ These give the time rounded to the nearest hour. The `TRUNC` variant rounds down
 * Get a Hindu calendar.
 * Get an Eastern Orthodox Christian calendar.
 * Get more national calendars.
+* Create a version of this for PostgreSQL.
 * Create a version of this for SQL Server.
 * Create a version of this for Oracle.
 
 Any input and suggestions are welcome.
+
+## Performance tip
+
+With the exception of the `easter_west_input` and `jewish_input` tables, all the calendar data is provided as sql views. You may want to *materialize* those views -- put that data into tables and index it -- to get good performance in production. 
 
 ## Credits
 

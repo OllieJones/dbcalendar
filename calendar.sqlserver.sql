@@ -1,31 +1,125 @@
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET NAMES utf8 */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 
-CREATE TABLE `christian_west_source` (
-	`DAY` DATE NULL,
-	`EVENT` VARCHAR(13) NOT NULL COLLATE 'utf8mb4_general_ci',
-	`calendar` VARCHAR(19) NOT NULL COLLATE 'utf8mb4_general_ci'
-) ENGINE=MyISAM;
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
 
-CREATE TABLE `day_input` (
-	`day` DATE NULL
-) ENGINE=MyISAM;
+DROP FUNCTION IF EXISTS dbo.TRUNC_DAY
+GO
+CREATE FUNCTION dbo.TRUNC_DAY ( @datestamp DATETIME)  RETURNS DATE
+AS
+BEGIN
+	RETURN CAST(@datestamp AS DATE)
+END
+GO
 
-CREATE TABLE `day_source` (
-	`day` DATE NULL,
-	`year` INT(4) NULL
-) ENGINE=MyISAM;
 
-CREATE TABLE IF NOT EXISTS `easter_west_input` (
-  `day` date NOT NULL DEFAULT '2000-01-01',
-  KEY `PK` (`day`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='From http://tlarsen2.tripod.com/thomaslarsen/easterdates.html';
+DROP FUNCTION IF EXISTS dbo.TO_DAYS
+GO
+CREATE FUNCTION dbo.TO_DAYS (@datestamp DATETIME) RETURNS INT
+AS
+BEGIN
+   RETURN 366 + DATEDIFF(day,'0001-01-01',@datestamp)
+END
+GO
 
-/*!40000 ALTER TABLE `easter_west_input` DISABLE KEYS */;
-INSERT INTO `easter_west_input` (`day`) VALUES
+DROP FUNCTION IF EXISTS dbo.FROM_DAYS
+GO
+CREATE FUNCTION dbo.FROM_DAYS (@days INT) RETURNS DATE
+AS
+BEGIN
+    RETURN DATEADD(day, @days - 366, CAST('0001-01-01' AS DATE))
+END
+GO
+
+
+DROP FUNCTION IF EXISTS dbo.TRUNC_DAYOFWEEK
+GO
+CREATE FUNCTION dbo.TRUNC_DAYOFWEEK ( @datestamp DATETIME, @dayofweek INT) RETURNS DATE
+AS
+BEGIN
+  DECLARE @days INT =  366 + DATEDIFF(day,'0001-01-01',@datestamp)
+  RETURN dbo.FROM_DAYS(@days - ((@days - @dayofweek) % 7))
+END
+GO
+
+
+
+DROP FUNCTION IF EXISTS dbo.TRUNC_SUNDAY
+GO
+CREATE FUNCTION dbo.TRUNC_SUNDAY ( @datestamp DATETIME) RETURNS DATE
+AS
+BEGIN
+  RETURN dbo.TRUNC_DAYOFWEEK(@datestamp, 1)
+END
+GO
+
+
+DROP FUNCTION IF EXISTS dbo.TRUNC_MONDAY
+GO
+CREATE FUNCTION dbo.TRUNC_MONDAY ( @datestamp DATETIME) RETURNS DATE
+AS
+BEGIN
+  RETURN dbo.TRUNC_DAYOFWEEK(@datestamp, 2)
+END
+GO
+
+
+
+
+
+
+DROP VIEW IF EXISTS dbo.year_input;
+GO
+CREATE VIEW dbo.year_input AS
+SELECT 1700 + (A.N + 4*(B.N + 5*(C.N + 5*(D.N)))) AS year
+  FROM (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 ) A
+  CROSS JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4) B
+  CROSS JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4) C
+  CROSS JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5) D;
+GO
+
+DROP VIEW IF EXISTS dbo.day_input;
+GO
+CREATE VIEW dbo.day_input AS
+SELECT DATEADD(DAY, A.N + 3*(B.N + 3*(C.N + 4*(D.N + 5*(E.N + 5*(F.N + 5*(G.N + 7*(H.N))))))), CAST('1700-01-01' AS DATE)) day
+  FROM (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2)  A
+  CROSS JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2)  B
+  CROSS JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3)  C
+  CROSS JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4)  D
+  CROSS JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4)  E
+  CROSS JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4)  F
+  CROSS JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6)  G
+  CROSS JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6) H 
+GO
+
+DROP VIEW IF EXISTS dbo.year_source
+GO
+
+CREATE VIEW year_source AS
+SELECT DATEFROMPARTS(year,1,1) day, year
+  FROM year_input 
+GO
+
+DROP VIEW IF EXISTS dbo.day_source
+GO
+CREATE VIEW dbo.day_source AS
+SELECT day, YEAR(day) year FROM day_input;
+GO
+
+DROP VIEW IF EXISTS dbo.christian_west_source
+GO
+
+
+
+DROP TABLE IF EXISTS dbo.easter_west_input;
+GO
+
+CREATE TABLE easter_west_input (
+  day date NOT NULL DEFAULT '2000-01-01' PRIMARY KEY,
+)  ;
+
+INSERT INTO easter_west_input (day) VALUES
 	('1700-04-11'),
 	('1701-03-27'),
 	('1702-04-16'),
@@ -535,7 +629,7 @@ INSERT INTO `easter_west_input` (`day`) VALUES
 	('2206-03-30'),
 	('2207-04-19'),
 	('2208-04-03');
-INSERT INTO `easter_west_input` (`day`) VALUES
+INSERT INTO easter_west_input (day) VALUES
 	('2209-03-26'),
 	('2210-04-15'),
 	('2211-03-31'),
@@ -627,55 +721,34 @@ INSERT INTO `easter_west_input` (`day`) VALUES
 	('2297-04-11'),
 	('2298-04-03'),
 	('2299-04-16');
-/*!40000 ALTER TABLE `easter_west_input` ENABLE KEYS */;
 
-DELIMITER //
-CREATE FUNCTION `FIRST_DAYOFWEEK_OF`(datestamp DATETIME, dayofweek INT) RETURNS date
-    NO SQL
-    DETERMINISTIC
-    COMMENT 'first weekday of a month, where dayofweek: 1=sunday, 2=monday, etc'
-RETURN TRUNC_DAYOFWEEK((LAST_DAY(datestamp) + INTERVAL 1 DAY - INTERVAL 1 MONTH + INTERVAL 6 DAY), dayofweek)//
-DELIMITER ;
+DROP TABLE IF EXISTS dbo.jewish_input;
+GO
 
-DELIMITER //
-CREATE FUNCTION `FIRST_MONDAY_OF`(datestamp DATETIME) RETURNS date
-    NO SQL
-    DETERMINISTIC
-    COMMENT 'first monday of the month'
-RETURN FIRST_DAYOFWEEK_OF(datestamp, 2)//
-DELIMITER ;
-
-CREATE TABLE `holiday_source` (
-	`day` DATE NULL,
-	`year` INT(4) NULL,
-	`event` VARCHAR(50) NOT NULL COLLATE 'latin1_swedish_ci',
-	`calendar` VARCHAR(19) NOT NULL COLLATE 'utf8mb4_general_ci'
-) ENGINE=MyISAM;
-
-CREATE TABLE IF NOT EXISTS `jewish_input` (
-  `day` date NOT NULL,
-  `event` varchar(50) CHARACTER SET latin1 NOT NULL,
-  KEY `Index 1` (`day`,`event`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='LIcensed from hebcal.com acording to Creative Commons 3.0 Attribution';
+CREATE TABLE jewish_input (
+  day date NOT NULL,
+  event nvarchar(50) NOT NULL,
+  PRIMARY KEY (day,event)
+) 
 
 /*!40000 ALTER TABLE `jewish_input` DISABLE KEYS */;
-INSERT INTO `jewish_input` (`day`, `event`) VALUES
+INSERT INTO jewish_input (day, event) VALUES
 	('2019-03-20', 'Erev Purim'),
 	('2019-03-21', 'Purim'),
 	('2019-04-19', 'Erev Pesach'),
 	('2019-04-20', 'Pesach I'),
 	('2019-04-21', 'Pesach II'),
-	('2019-04-22', 'Pesach III (CH\'\'M)'),
-	('2019-04-23', 'Pesach IV (CH\'\'M)'),
-	('2019-04-24', 'Pesach V (CH\'\'M)'),
-	('2019-04-25', 'Pesach VI (CH\'\'M)'),
+	('2019-04-22', 'Pesach III (CH''''M)'),
+	('2019-04-23', 'Pesach IV (CH''''M)'),
+	('2019-04-24', 'Pesach V (CH''''M)'),
+	('2019-04-25', 'Pesach VI (CH''''M)'),
 	('2019-04-26', 'Pesach VII'),
 	('2019-04-27', 'Pesach VIII'),
 	('2019-06-08', 'Erev Shavuot'),
 	('2019-06-09', 'Shavuot I'),
 	('2019-06-10', 'Shavuot II'),
-	('2019-08-10', 'Erev Tish\'a B\'Av'),
-	('2019-08-11', 'Tish\'a B\'Av'),
+	('2019-08-10', 'Erev Tish''a B''Av'),
+	('2019-08-11', 'Tish''a B''Av'),
 	('2019-09-29', 'Erev Rosh Hashana'),
 	('2019-09-30', 'Rosh Hashana 5780'),
 	('2019-10-01', 'Rosh Hashana II'),
@@ -684,10 +757,10 @@ INSERT INTO `jewish_input` (`day`, `event`) VALUES
 	('2019-10-13', 'Erev Sukkot'),
 	('2019-10-14', 'Sukkot I'),
 	('2019-10-15', 'Sukkot II'),
-	('2019-10-16', 'Sukkot III (CH\'\'M)'),
-	('2019-10-17', 'Sukkot IV (CH\'\'M)'),
-	('2019-10-18', 'Sukkot V (CH\'\'M)'),
-	('2019-10-19', 'Sukkot VI (CH\'\'M)'),
+	('2019-10-16', 'Sukkot III (CH''''M)'),
+	('2019-10-17', 'Sukkot IV (CH''''M)'),
+	('2019-10-18', 'Sukkot V (CH''''M)'),
+	('2019-10-19', 'Sukkot VI (CH''''M)'),
 	('2019-10-20', 'Sukkot VII (Hoshana Raba)'),
 	('2019-10-21', 'Shmini Atzeret'),
 	('2019-10-22', 'Simchat Torah'),
@@ -705,17 +778,17 @@ INSERT INTO `jewish_input` (`day`, `event`) VALUES
 	('2020-04-08', 'Erev Pesach'),
 	('2020-04-09', 'Pesach I'),
 	('2020-04-10', 'Pesach II'),
-	('2020-04-11', 'Pesach III (CH\'\'M)'),
-	('2020-04-12', 'Pesach IV (CH\'\'M)'),
-	('2020-04-13', 'Pesach V (CH\'\'M)'),
-	('2020-04-14', 'Pesach VI (CH\'\'M)'),
+	('2020-04-11', 'Pesach III (CH''''M)'),
+	('2020-04-12', 'Pesach IV (CH''''M)'),
+	('2020-04-13', 'Pesach V (CH''''M)'),
+	('2020-04-14', 'Pesach VI (CH''''M)'),
 	('2020-04-15', 'Pesach VII'),
 	('2020-04-16', 'Pesach VIII'),
 	('2020-05-28', 'Erev Shavuot'),
 	('2020-05-29', 'Shavuot I'),
 	('2020-05-30', 'Shavuot II'),
-	('2020-07-29', 'Erev Tish\'a B\'Av'),
-	('2020-07-30', 'Tish\'a B\'Av'),
+	('2020-07-29', 'Erev Tish''a B''Av'),
+	('2020-07-30', 'Tish''a B''Av'),
 	('2020-09-18', 'Erev Rosh Hashana'),
 	('2020-09-19', 'Rosh Hashana 5781'),
 	('2020-09-20', 'Rosh Hashana II'),
@@ -724,10 +797,10 @@ INSERT INTO `jewish_input` (`day`, `event`) VALUES
 	('2020-10-02', 'Erev Sukkot'),
 	('2020-10-03', 'Sukkot I'),
 	('2020-10-04', 'Sukkot II'),
-	('2020-10-05', 'Sukkot III (CH\'\'M)'),
-	('2020-10-06', 'Sukkot IV (CH\'\'M)'),
-	('2020-10-07', 'Sukkot V (CH\'\'M)'),
-	('2020-10-08', 'Sukkot VI (CH\'\'M)'),
+	('2020-10-05', 'Sukkot III (CH''''M)'),
+	('2020-10-06', 'Sukkot IV (CH''''M)'),
+	('2020-10-07', 'Sukkot V (CH''''M)'),
+	('2020-10-08', 'Sukkot VI (CH''''M)'),
 	('2020-10-09', 'Sukkot VII (Hoshana Raba)'),
 	('2020-10-10', 'Shmini Atzeret'),
 	('2020-10-11', 'Simchat Torah'),
@@ -745,17 +818,17 @@ INSERT INTO `jewish_input` (`day`, `event`) VALUES
 	('2021-03-27', 'Erev Pesach'),
 	('2021-03-28', 'Pesach I'),
 	('2021-03-29', 'Pesach II'),
-	('2021-03-30', 'Pesach III (CH\'\'M)'),
-	('2021-03-31', 'Pesach IV (CH\'\'M)'),
-	('2021-04-01', 'Pesach V (CH\'\'M)'),
-	('2021-04-02', 'Pesach VI (CH\'\'M)'),
+	('2021-03-30', 'Pesach III (CH''''M)'),
+	('2021-03-31', 'Pesach IV (CH''''M)'),
+	('2021-04-01', 'Pesach V (CH''''M)'),
+	('2021-04-02', 'Pesach VI (CH''''M)'),
 	('2021-04-03', 'Pesach VII'),
 	('2021-04-04', 'Pesach VIII'),
 	('2021-05-16', 'Erev Shavuot'),
 	('2021-05-17', 'Shavuot I'),
 	('2021-05-18', 'Shavuot II'),
-	('2021-07-17', 'Erev Tish\'a B\'Av'),
-	('2021-07-18', 'Tish\'a B\'Av'),
+	('2021-07-17', 'Erev Tish''a B''Av'),
+	('2021-07-18', 'Tish''a B''Av'),
 	('2021-09-06', 'Erev Rosh Hashana'),
 	('2021-09-07', 'Rosh Hashana 5782'),
 	('2021-09-08', 'Rosh Hashana II'),
@@ -764,10 +837,10 @@ INSERT INTO `jewish_input` (`day`, `event`) VALUES
 	('2021-09-20', 'Erev Sukkot'),
 	('2021-09-21', 'Sukkot I'),
 	('2021-09-22', 'Sukkot II'),
-	('2021-09-23', 'Sukkot III (CH\'\'M)'),
-	('2021-09-24', 'Sukkot IV (CH\'\'M)'),
-	('2021-09-25', 'Sukkot V (CH\'\'M)'),
-	('2021-09-26', 'Sukkot VI (CH\'\'M)'),
+	('2021-09-23', 'Sukkot III (CH''''M)'),
+	('2021-09-24', 'Sukkot IV (CH''''M)'),
+	('2021-09-25', 'Sukkot V (CH''''M)'),
+	('2021-09-26', 'Sukkot VI (CH''''M)'),
 	('2021-09-27', 'Sukkot VII (Hoshana Raba)'),
 	('2021-09-28', 'Shmini Atzeret'),
 	('2021-09-29', 'Simchat Torah'),
@@ -785,17 +858,17 @@ INSERT INTO `jewish_input` (`day`, `event`) VALUES
 	('2022-04-15', 'Erev Pesach'),
 	('2022-04-16', 'Pesach I'),
 	('2022-04-17', 'Pesach II'),
-	('2022-04-18', 'Pesach III (CH\'\'M)'),
-	('2022-04-19', 'Pesach IV (CH\'\'M)'),
-	('2022-04-20', 'Pesach V (CH\'\'M)'),
-	('2022-04-21', 'Pesach VI (CH\'\'M)'),
+	('2022-04-18', 'Pesach III (CH''''M)'),
+	('2022-04-19', 'Pesach IV (CH''''M)'),
+	('2022-04-20', 'Pesach V (CH''''M)'),
+	('2022-04-21', 'Pesach VI (CH''''M)'),
 	('2022-04-22', 'Pesach VII'),
 	('2022-04-23', 'Pesach VIII'),
 	('2022-06-04', 'Erev Shavuot'),
 	('2022-06-05', 'Shavuot I'),
 	('2022-06-06', 'Shavuot II'),
-	('2022-08-06', 'Erev Tish\'a B\'Av'),
-	('2022-08-07', 'Tish\'a B\'Av'),
+	('2022-08-06', 'Erev Tish''a B''Av'),
+	('2022-08-07', 'Tish''a B''Av'),
 	('2022-09-25', 'Erev Rosh Hashana'),
 	('2022-09-26', 'Rosh Hashana 5783'),
 	('2022-09-27', 'Rosh Hashana II'),
@@ -804,10 +877,10 @@ INSERT INTO `jewish_input` (`day`, `event`) VALUES
 	('2022-10-09', 'Erev Sukkot'),
 	('2022-10-10', 'Sukkot I'),
 	('2022-10-11', 'Sukkot II'),
-	('2022-10-12', 'Sukkot III (CH\'\'M)'),
-	('2022-10-13', 'Sukkot IV (CH\'\'M)'),
-	('2022-10-14', 'Sukkot V (CH\'\'M)'),
-	('2022-10-15', 'Sukkot VI (CH\'\'M)'),
+	('2022-10-12', 'Sukkot III (CH''''M)'),
+	('2022-10-13', 'Sukkot IV (CH''''M)'),
+	('2022-10-14', 'Sukkot V (CH''''M)'),
+	('2022-10-15', 'Sukkot VI (CH''''M)'),
 	('2022-10-16', 'Sukkot VII (Hoshana Raba)'),
 	('2022-10-17', 'Shmini Atzeret'),
 	('2022-10-18', 'Simchat Torah'),
@@ -825,17 +898,17 @@ INSERT INTO `jewish_input` (`day`, `event`) VALUES
 	('2023-04-05', 'Erev Pesach'),
 	('2023-04-06', 'Pesach I'),
 	('2023-04-07', 'Pesach II'),
-	('2023-04-08', 'Pesach III (CH\'\'M)'),
-	('2023-04-09', 'Pesach IV (CH\'\'M)'),
-	('2023-04-10', 'Pesach V (CH\'\'M)'),
-	('2023-04-11', 'Pesach VI (CH\'\'M)'),
+	('2023-04-08', 'Pesach III (CH''''M)'),
+	('2023-04-09', 'Pesach IV (CH''''M)'),
+	('2023-04-10', 'Pesach V (CH''''M)'),
+	('2023-04-11', 'Pesach VI (CH''''M)'),
 	('2023-04-12', 'Pesach VII'),
 	('2023-04-13', 'Pesach VIII'),
 	('2023-05-25', 'Erev Shavuot'),
 	('2023-05-26', 'Shavuot I'),
 	('2023-05-27', 'Shavuot II'),
-	('2023-07-26', 'Erev Tish\'a B\'Av'),
-	('2023-07-27', 'Tish\'a B\'Av'),
+	('2023-07-26', 'Erev Tish''a B''Av'),
+	('2023-07-27', 'Tish''a B''Av'),
 	('2023-09-15', 'Erev Rosh Hashana'),
 	('2023-09-16', 'Rosh Hashana 5784'),
 	('2023-09-17', 'Rosh Hashana II'),
@@ -844,10 +917,10 @@ INSERT INTO `jewish_input` (`day`, `event`) VALUES
 	('2023-09-29', 'Erev Sukkot'),
 	('2023-09-30', 'Sukkot I'),
 	('2023-10-01', 'Sukkot II'),
-	('2023-10-02', 'Sukkot III (CH\'\'M)'),
-	('2023-10-03', 'Sukkot IV (CH\'\'M)'),
-	('2023-10-04', 'Sukkot V (CH\'\'M)'),
-	('2023-10-05', 'Sukkot VI (CH\'\'M)'),
+	('2023-10-02', 'Sukkot III (CH''''M)'),
+	('2023-10-03', 'Sukkot IV (CH''''M)'),
+	('2023-10-04', 'Sukkot V (CH''''M)'),
+	('2023-10-05', 'Sukkot VI (CH''''M)'),
 	('2023-10-06', 'Sukkot VII (Hoshana Raba)'),
 	('2023-10-07', 'Shmini Atzeret'),
 	('2023-10-08', 'Simchat Torah'),
@@ -865,17 +938,17 @@ INSERT INTO `jewish_input` (`day`, `event`) VALUES
 	('2024-04-22', 'Erev Pesach'),
 	('2024-04-23', 'Pesach I'),
 	('2024-04-24', 'Pesach II'),
-	('2024-04-25', 'Pesach III (CH\'\'M)'),
-	('2024-04-26', 'Pesach IV (CH\'\'M)'),
-	('2024-04-27', 'Pesach V (CH\'\'M)'),
-	('2024-04-28', 'Pesach VI (CH\'\'M)'),
+	('2024-04-25', 'Pesach III (CH''''M)'),
+	('2024-04-26', 'Pesach IV (CH''''M)'),
+	('2024-04-27', 'Pesach V (CH''''M)'),
+	('2024-04-28', 'Pesach VI (CH''''M)'),
 	('2024-04-29', 'Pesach VII'),
 	('2024-04-30', 'Pesach VIII'),
 	('2024-06-11', 'Erev Shavuot'),
 	('2024-06-12', 'Shavuot I'),
 	('2024-06-13', 'Shavuot II'),
-	('2024-08-12', 'Erev Tish\'a B\'Av'),
-	('2024-08-13', 'Tish\'a B\'Av'),
+	('2024-08-12', 'Erev Tish''a B''Av'),
+	('2024-08-13', 'Tish''a B''Av'),
 	('2024-10-02', 'Erev Rosh Hashana'),
 	('2024-10-03', 'Rosh Hashana 5785'),
 	('2024-10-04', 'Rosh Hashana II'),
@@ -884,10 +957,10 @@ INSERT INTO `jewish_input` (`day`, `event`) VALUES
 	('2024-10-16', 'Erev Sukkot'),
 	('2024-10-17', 'Sukkot I'),
 	('2024-10-18', 'Sukkot II'),
-	('2024-10-19', 'Sukkot III (CH\'\'M)'),
-	('2024-10-20', 'Sukkot IV (CH\'\'M)'),
-	('2024-10-21', 'Sukkot V (CH\'\'M)'),
-	('2024-10-22', 'Sukkot VI (CH\'\'M)'),
+	('2024-10-19', 'Sukkot III (CH''''M)'),
+	('2024-10-20', 'Sukkot IV (CH''''M)'),
+	('2024-10-21', 'Sukkot V (CH''''M)'),
+	('2024-10-22', 'Sukkot VI (CH''''M)'),
 	('2024-10-23', 'Sukkot VII (Hoshana Raba)'),
 	('2024-10-24', 'Shmini Atzeret'),
 	('2024-10-25', 'Simchat Torah'),
@@ -905,18 +978,18 @@ INSERT INTO `jewish_input` (`day`, `event`) VALUES
 	('2025-04-12', 'Erev Pesach'),
 	('2025-04-13', 'Pesach I'),
 	('2025-04-14', 'Pesach II'),
-	('2025-04-15', 'Pesach III (CH\'\'M)'),
-	('2025-04-16', 'Pesach IV (CH\'\'M)'),
-	('2025-04-17', 'Pesach V (CH\'\'M)');
-INSERT INTO `jewish_input` (`day`, `event`) VALUES
-	('2025-04-18', 'Pesach VI (CH\'\'M)'),
+	('2025-04-15', 'Pesach III (CH''''M)'),
+	('2025-04-16', 'Pesach IV (CH''''M)'),
+	('2025-04-17', 'Pesach V (CH''''M)');
+INSERT INTO jewish_input (day, event) VALUES
+	('2025-04-18', 'Pesach VI (CH''''M)'),
 	('2025-04-19', 'Pesach VII'),
 	('2025-04-20', 'Pesach VIII'),
 	('2025-06-01', 'Erev Shavuot'),
 	('2025-06-02', 'Shavuot I'),
 	('2025-06-03', 'Shavuot II'),
-	('2025-08-02', 'Erev Tish\'a B\'Av'),
-	('2025-08-03', 'Tish\'a B\'Av'),
+	('2025-08-02', 'Erev Tish''a B''Av'),
+	('2025-08-03', 'Tish''a B''Av'),
 	('2025-09-22', 'Erev Rosh Hashana'),
 	('2025-09-23', 'Rosh Hashana 5786'),
 	('2025-09-24', 'Rosh Hashana II'),
@@ -925,10 +998,10 @@ INSERT INTO `jewish_input` (`day`, `event`) VALUES
 	('2025-10-06', 'Erev Sukkot'),
 	('2025-10-07', 'Sukkot I'),
 	('2025-10-08', 'Sukkot II'),
-	('2025-10-09', 'Sukkot III (CH\'\'M)'),
-	('2025-10-10', 'Sukkot IV (CH\'\'M)'),
-	('2025-10-11', 'Sukkot V (CH\'\'M)'),
-	('2025-10-12', 'Sukkot VI (CH\'\'M)'),
+	('2025-10-09', 'Sukkot III (CH''''M)'),
+	('2025-10-10', 'Sukkot IV (CH''''M)'),
+	('2025-10-11', 'Sukkot V (CH''''M)'),
+	('2025-10-12', 'Sukkot VI (CH''''M)'),
 	('2025-10-13', 'Sukkot VII (Hoshana Raba)'),
 	('2025-10-14', 'Shmini Atzeret'),
 	('2025-10-15', 'Simchat Torah'),
@@ -946,17 +1019,17 @@ INSERT INTO `jewish_input` (`day`, `event`) VALUES
 	('2026-04-01', 'Erev Pesach'),
 	('2026-04-02', 'Pesach I'),
 	('2026-04-03', 'Pesach II'),
-	('2026-04-04', 'Pesach III (CH\'\'M)'),
-	('2026-04-05', 'Pesach IV (CH\'\'M)'),
-	('2026-04-06', 'Pesach V (CH\'\'M)'),
-	('2026-04-07', 'Pesach VI (CH\'\'M)'),
+	('2026-04-04', 'Pesach III (CH''''M)'),
+	('2026-04-05', 'Pesach IV (CH''''M)'),
+	('2026-04-06', 'Pesach V (CH''''M)'),
+	('2026-04-07', 'Pesach VI (CH''''M)'),
 	('2026-04-08', 'Pesach VII'),
 	('2026-04-09', 'Pesach VIII'),
 	('2026-05-21', 'Erev Shavuot'),
 	('2026-05-22', 'Shavuot I'),
 	('2026-05-23', 'Shavuot II'),
-	('2026-07-22', 'Erev Tish\'a B\'Av'),
-	('2026-07-23', 'Tish\'a B\'Av'),
+	('2026-07-22', 'Erev Tish''a B''Av'),
+	('2026-07-23', 'Tish''a B''Av'),
 	('2026-09-11', 'Erev Rosh Hashana'),
 	('2026-09-12', 'Rosh Hashana 5787'),
 	('2026-09-13', 'Rosh Hashana II'),
@@ -965,10 +1038,10 @@ INSERT INTO `jewish_input` (`day`, `event`) VALUES
 	('2026-09-25', 'Erev Sukkot'),
 	('2026-09-26', 'Sukkot I'),
 	('2026-09-27', 'Sukkot II'),
-	('2026-09-28', 'Sukkot III (CH\'\'M)'),
-	('2026-09-29', 'Sukkot IV (CH\'\'M)'),
-	('2026-09-30', 'Sukkot V (CH\'\'M)'),
-	('2026-10-01', 'Sukkot VI (CH\'\'M)'),
+	('2026-09-28', 'Sukkot III (CH''''M)'),
+	('2026-09-29', 'Sukkot IV (CH''''M)'),
+	('2026-09-30', 'Sukkot V (CH''''M)'),
+	('2026-10-01', 'Sukkot VI (CH''''M)'),
 	('2026-10-02', 'Sukkot VII (Hoshana Raba)'),
 	('2026-10-03', 'Shmini Atzeret'),
 	('2026-10-04', 'Simchat Torah'),
@@ -986,17 +1059,17 @@ INSERT INTO `jewish_input` (`day`, `event`) VALUES
 	('2027-04-21', 'Erev Pesach'),
 	('2027-04-22', 'Pesach I'),
 	('2027-04-23', 'Pesach II'),
-	('2027-04-24', 'Pesach III (CH\'\'M)'),
-	('2027-04-25', 'Pesach IV (CH\'\'M)'),
-	('2027-04-26', 'Pesach V (CH\'\'M)'),
-	('2027-04-27', 'Pesach VI (CH\'\'M)'),
+	('2027-04-24', 'Pesach III (CH''''M)'),
+	('2027-04-25', 'Pesach IV (CH''''M)'),
+	('2027-04-26', 'Pesach V (CH''''M)'),
+	('2027-04-27', 'Pesach VI (CH''''M)'),
 	('2027-04-28', 'Pesach VII'),
 	('2027-04-29', 'Pesach VIII'),
 	('2027-06-10', 'Erev Shavuot'),
 	('2027-06-11', 'Shavuot I'),
 	('2027-06-12', 'Shavuot II'),
-	('2027-08-11', 'Erev Tish\'a B\'Av'),
-	('2027-08-12', 'Tish\'a B\'Av'),
+	('2027-08-11', 'Erev Tish''a B''Av'),
+	('2027-08-12', 'Tish''a B''Av'),
 	('2027-10-01', 'Erev Rosh Hashana'),
 	('2027-10-02', 'Rosh Hashana 5788'),
 	('2027-10-03', 'Rosh Hashana II'),
@@ -1005,10 +1078,10 @@ INSERT INTO `jewish_input` (`day`, `event`) VALUES
 	('2027-10-15', 'Erev Sukkot'),
 	('2027-10-16', 'Sukkot I'),
 	('2027-10-17', 'Sukkot II'),
-	('2027-10-18', 'Sukkot III (CH\'\'M)'),
-	('2027-10-19', 'Sukkot IV (CH\'\'M)'),
-	('2027-10-20', 'Sukkot V (CH\'\'M)'),
-	('2027-10-21', 'Sukkot VI (CH\'\'M)'),
+	('2027-10-18', 'Sukkot III (CH''''M)'),
+	('2027-10-19', 'Sukkot IV (CH''''M)'),
+	('2027-10-20', 'Sukkot V (CH''''M)'),
+	('2027-10-21', 'Sukkot VI (CH''''M)'),
 	('2027-10-22', 'Sukkot VII (Hoshana Raba)'),
 	('2027-10-23', 'Shmini Atzeret'),
 	('2027-10-24', 'Simchat Torah'),
@@ -1026,17 +1099,17 @@ INSERT INTO `jewish_input` (`day`, `event`) VALUES
 	('2028-04-10', 'Erev Pesach'),
 	('2028-04-11', 'Pesach I'),
 	('2028-04-12', 'Pesach II'),
-	('2028-04-13', 'Pesach III (CH\'\'M)'),
-	('2028-04-14', 'Pesach IV (CH\'\'M)'),
-	('2028-04-15', 'Pesach V (CH\'\'M)'),
-	('2028-04-16', 'Pesach VI (CH\'\'M)'),
+	('2028-04-13', 'Pesach III (CH''''M)'),
+	('2028-04-14', 'Pesach IV (CH''''M)'),
+	('2028-04-15', 'Pesach V (CH''''M)'),
+	('2028-04-16', 'Pesach VI (CH''''M)'),
 	('2028-04-17', 'Pesach VII'),
 	('2028-04-18', 'Pesach VIII'),
 	('2028-05-30', 'Erev Shavuot'),
 	('2028-05-31', 'Shavuot I'),
 	('2028-06-01', 'Shavuot II'),
-	('2028-07-31', 'Erev Tish\'a B\'Av'),
-	('2028-08-01', 'Tish\'a B\'Av'),
+	('2028-07-31', 'Erev Tish''a B''Av'),
+	('2028-08-01', 'Tish''a B''Av'),
 	('2028-09-20', 'Erev Rosh Hashana'),
 	('2028-09-21', 'Rosh Hashana 5789'),
 	('2028-09-22', 'Rosh Hashana II'),
@@ -1045,10 +1118,10 @@ INSERT INTO `jewish_input` (`day`, `event`) VALUES
 	('2028-10-04', 'Erev Sukkot'),
 	('2028-10-05', 'Sukkot I'),
 	('2028-10-06', 'Sukkot II'),
-	('2028-10-07', 'Sukkot III (CH\'\'M)'),
-	('2028-10-08', 'Sukkot IV (CH\'\'M)'),
-	('2028-10-09', 'Sukkot V (CH\'\'M)'),
-	('2028-10-10', 'Sukkot VI (CH\'\'M)'),
+	('2028-10-07', 'Sukkot III (CH''''M)'),
+	('2028-10-08', 'Sukkot IV (CH''''M)'),
+	('2028-10-09', 'Sukkot V (CH''''M)'),
+	('2028-10-10', 'Sukkot VI (CH''''M)'),
 	('2028-10-11', 'Sukkot VII (Hoshana Raba)'),
 	('2028-10-12', 'Shmini Atzeret'),
 	('2028-10-13', 'Simchat Torah'),
@@ -1061,262 +1134,26 @@ INSERT INTO `jewish_input` (`day`, `event`) VALUES
 	('2028-12-18', 'Chanukah: 7 Candles'),
 	('2028-12-19', 'Chanukah: 8 Candles'),
 	('2028-12-20', 'Chanukah: 8th Day');
-/*!40000 ALTER TABLE `jewish_input` ENABLE KEYS */;
 
-CREATE TABLE `jewish_source` (
-	`day` DATE NOT NULL,
-	`year` INT(4) NULL,
-	`event` VARCHAR(50) NOT NULL COLLATE 'latin1_swedish_ci',
-	`calendar` VARCHAR(6) NOT NULL COLLATE 'utf8mb4_general_ci'
-) ENGINE=MyISAM;
+GO
 
-DELIMITER //
-CREATE FUNCTION DATEFROMPARTS(year INT, month INT, day INT) RETURNS date
-    NO SQL
-    DETERMINISTIC
-    comment 'Make a date from y,m,d; matches native function in SQL Server'
-RETURN DATE(CONCAT_WS('-', year,month,day))//
-DELIMITER ;
+DROP VIEW IF EXISTS christian_west_source
+GO
 
-DELIMITER //
-CREATE FUNCTION `LAST_DAYOFWEEK_OF`(datestamp DATETIME, dayofweek INT) RETURNS date
-    NO SQL
-    DETERMINISTIC
-    COMMENT 'last weekday of a month, where dayofweek: 1=sunday, 2=monday, etc'
-RETURN TRUNC_DAYOFWEEK(LAST_DAY(datestamp), dayofweek)//
-DELIMITER ;
-
-DELIMITER //
-CREATE FUNCTION `LAST_MONDAY_OF`(datestamp DATETIME) RETURNS date
-    NO SQL
-    DETERMINISTIC
-    COMMENT 'last monday of the month'
-RETURN LAST_DAYOFWEEK_OF(datestamp, 2)//
-DELIMITER ;
-
-CREATE TABLE `north_america_source` (
-	`DAY` DATE NULL,
-	`EVENT` VARCHAR(21) NOT NULL COLLATE 'utf8mb4_general_ci',
-	`calendar` VARCHAR(13) NOT NULL COLLATE 'utf8mb4_general_ci'
-) ENGINE=MyISAM;
-
-DELIMITER //
-CREATE FUNCTION `ROUND_HOUR`(datestamp DATETIME) RETURNS datetime
-    NO SQL
-    DETERMINISTIC
-    COMMENT 'returns nearest hour'
-RETURN DATE_FORMAT(datestamp + INTERVAL 30 MINUTE, '%Y-%m-%d %H:00')//
-DELIMITER ;
-
-CREATE TABLE `seq_0_65535` (
-	`seq` BIGINT(25) NOT NULL
-) ENGINE=MyISAM;
-
-DELIMITER //
-CREATE FUNCTION `TRUNC_DAY`(datestamp DATETIME) RETURNS date
-    NO SQL
-    DETERMINISTIC
-    COMMENT 'returns current date (preceding midnight)'
-RETURN DATE(datestamp)//
-DELIMITER ;
-
-DELIMITER //
-CREATE FUNCTION `TRUNC_DAYOFWEEK`(datestamp DATETIME, dayofweek INT) RETURNS date
-    NO SQL
-    DETERMINISTIC
-    COMMENT 'preceding weekday, where dayofweek: 1=sunday, 2=monday, etc'
-RETURN FROM_DAYS(TO_DAYS(datestamp) -MOD(TO_DAYS(datestamp) -dayofweek, 7))//
-DELIMITER ;
-
-DELIMITER //
-CREATE FUNCTION `TRUNC_HOUR`(datestamp DATETIME) RETURNS datetime
-    NO SQL
-    DETERMINISTIC
-    COMMENT 'returns current hour'
-RETURN DATE_FORMAT(datestamp, '%Y-%m-%d %H:00')//
-DELIMITER ;
-
-DELIMITER //
-CREATE FUNCTION `TRUNC_MONDAY`(datestamp DATETIME) RETURNS date
-    NO SQL
-    DETERMINISTIC
-    COMMENT 'preceding Monday'
-RETURN TRUNC_DAYOFWEEK(datestamp, 2)//
-DELIMITER ;
-
-DELIMITER //
-CREATE FUNCTION `TRUNC_MONTH`(datestamp DATETIME) RETURNS date
-    NO SQL
-    DETERMINISTIC
-    COMMENT 'returns preceding first of the month'
-RETURN DATE(DATE_FORMAT(datestamp, '%Y-%m-01'))//
-DELIMITER ;
-
-DELIMITER //
-CREATE FUNCTION `TRUNC_N_HOURS`(datestamp DATETIME, n INT) RETURNS datetime
-    NO SQL
-    DETERMINISTIC
-    COMMENT 'truncate to N hour boundary. For example,\r\n           TRUNCATE_N_HOURS(sometime, 12) gives the nearest\r\n           preceding half-day (noon, or midnight'
-RETURN DATE(datestamp) +
-                INTERVAL (HOUR(datestamp) -
-                          HOUR(datestamp) MOD n) HOUR//
-DELIMITER ;
-
-DELIMITER //
-CREATE FUNCTION `TRUNC_N_MINUTES`(datestamp DATETIME, n INT) RETURNS datetime
-    NO SQL
-    DETERMINISTIC
-    COMMENT 'truncate to N minute boundary. For example,\r\n           TRUNCATE_N_MINUTES(sometime, 15) gives the nearest\r\n           preceding quarter hour'
-RETURN DATE_FORMAT(datestamp,'%Y-%m-%d %H:00') +
-                INTERVAL (MINUTE(datestamp) -
-                          MINUTE(datestamp) MOD n) MINUTE//
-DELIMITER ;
-
-DELIMITER //
-CREATE FUNCTION `TRUNC_QUARTER`(datestamp DATETIME) RETURNS date
-    NO SQL
-    DETERMINISTIC
-    COMMENT 'returns preceding first of the quarter'
-RETURN DATE(CONCAT(YEAR(datestamp),'-', 1 + 3*(QUARTER(datestamp)-1),'-01'))//
-DELIMITER ;
-
-DELIMITER //
-CREATE FUNCTION `TRUNC_SUNDAY`(datestamp DATETIME) RETURNS date
-    NO SQL
-    DETERMINISTIC
-    COMMENT 'preceding Sunday'
-RETURN TRUNC_DAYOFWEEK(datestamp, 1)//
-DELIMITER ;
-
-DELIMITER //
-CREATE FUNCTION `TRUNC_YEAR`(datestamp DATETIME) RETURNS date
-    NO SQL
-    DETERMINISTIC
-    COMMENT 'returns preceding first of the year'
-RETURN DATE(DATE_FORMAT(datestamp, '%Y-01-01'))//
-DELIMITER ;
-
-CREATE TABLE `weekend_source` (
-	`day` DATE NULL,
-	`year` INT(4) NULL,
-	`event` VARCHAR(7) NOT NULL COLLATE 'utf8mb4_general_ci',
-	`calendar` VARCHAR(7) NOT NULL COLLATE 'utf8mb4_general_ci'
-) ENGINE=MyISAM;
-
-CREATE TABLE `year_input` (
-	`year` BIGINT(18) NOT NULL
-) ENGINE=MyISAM;
-
-CREATE TABLE `year_source` (
-	`day` DATE NULL,
-	`year` BIGINT(18) NOT NULL
-) ENGINE=MyISAM;
-
-DROP TABLE IF EXISTS `christian_west_source`;
-CREATE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW `christian_west_source` AS SELECT DAY, 'Easter' EVENT, 'Christian (Western)' calendar FROM easter_west_input
+CREATE VIEW christian_west_source AS 
+SELECT [day], 'Easter' EVENT, 'Christian (Western)' calendar FROM easter_west_input
 UNION ALL
-SELECT DAY - INTERVAL 46 DAY, 'Ash Wednesday' EVENT, 'Christian (Western)' calendar FROM easter_west_input
+SELECT DATEADD(DAY, -46, [day]) day, 'Ash Wednesday' EVENT, 'Christian (Western)' calendar FROM easter_west_input
 UNION ALL 
-SELECT DAY + INTERVAL 7 WEEK, 'Pentecost' EVENT, 'Christian (Western)' calendar FROM easter_west_input
+SELECT DATEADD(WEEK, 7, [day]) day, 'Pentecost' EVENT, 'Christian (Western)' calendar FROM easter_west_input
 UNION ALL 
-SELECT DAY - INTERVAL 2 DAY, 'Good Friday' EVENT, 'Christian (Western)' calendar FROM easter_west_input
+SELECT  DATEADD(DAY, -2, [day]) day, 'Good Friday' EVENT, 'Christian (Western)' calendar FROM easter_west_input
 UNION ALL 
-SELECT DAY - INTERVAL 1 WEEK, 'Palm Sunday' EVENT, 'Christian (Western)' calendar FROM easter_west_input
+SELECT  DATEADD(WEEK, -1, [day]) day, 'Palm Sunday' EVENT, 'Christian (Western)' calendar FROM easter_west_input
 UNION ALL
-SELECT TRUNC_SUNDAY(CONCAT_WS('-', YEAR, 12, 24)) - INTERVAL 3 WEEK, 'Advent 1', 'Christian (Western)' FROM year_source 
+SELECT DATEADD(WEEK, -3, dbo.TRUNC_SUNDAY(DATEFROMPARTS(year,12,25))), 'Advent 1', 'Christian (Western)' FROM year_source 
 UNION ALL 
-SELECT DATE(CONCAT_WS('-', YEAR, 12, 25)), 'Christmas' EVENT, 'Christian (Western)' calendar from year_source
+SELECT DATEFROMPARTS(year,12,25), 'Christmas' EVENT, 'Christian (Western)' calendar from year_source
 UNION ALL
-SELECT DATE(CONCAT_WS('-', YEAR, 1, 6)), 'Epiphany' EVENT, 'Christian (Western)' calendar FROM year_source ;
-
-DROP TABLE IF EXISTS `day_input`;
-CREATE ALGORITHM=TEMPTABLE SQL SECURITY DEFINER VIEW `day_input` AS SELECT DATE('1700-01-01') 
-     + INTERVAL A.N + 3*(B.N + 3*(C.N + 4*(D.N + 5*(E.N + 5*(F.N + 5*(G.N + 7*(H.N))))))) DAY day
-  FROM (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2) AS A
-  JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2) AS B
-  JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3) AS C
-  JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4) AS D
-  JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4) AS E
-  JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4) AS F
-  JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6) AS G
-  JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6) AS H ;
-
-DROP TABLE IF EXISTS `day_source`;
-CREATE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW `day_source` AS SELECT day, YEAR(day) year FROM day_input ;
-
-DROP TABLE IF EXISTS `holiday_source`;
-CREATE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW `holiday_source` AS SELECT day, YEAR(day) year, event, calendar FROM christian_west_source
-UNION ALL
-SELECT day, YEAR(day) year, event, calendar FROM north_america_source 
-UNION ALL
-SELECT day, YEAR(day) year, event, calendar FROM jewish_source ;
-
-DROP TABLE IF EXISTS `jewish_source`;
-CREATE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW `jewish_source` AS SELECT day, YEAR(day) year, event, 'Jewish' as calendar
-from jewish_input ;
-
-DROP TABLE IF EXISTS `north_america_source`;
-CREATE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW `north_america_source` AS SELECT DATE(CONCAT_WS('-',YEAR, 1, 1)) DAY, 'New Year''s Day' EVENT, 'USA' calendar FROM year_source
-UNION ALL
-SELECT FIRST_MONDAY_OF(DATE(CONCAT_WS('-',YEAR, 1, 1))) + INTERVAL 2 WEEK DAY, 'Dr. King''s Birthday' EVENT, 'USA' calendar FROM year_source
-UNION ALL
-SELECT FIRST_MONDAY_OF(DATE(CONCAT_WS('-',YEAR, 2, 1))) + INTERVAL 2 WEEK DAY, 'Washington''s Birthday' EVENT, 'USA' calendar FROM year_source
-UNION ALL
-SELECT day, event, 'Canada' calendar FROM christian_west_source WHERE event = 'Good Friday'
-UNION ALL 
-SELECT FIRST_MONDAY_OF(DATE(CONCAT_WS('-',YEAR, 4, 1))) + INTERVAL 2 WEEK DAY, 'Patriots'' Day' EVENT, 'Massachusetts' calendar FROM year_source
-UNION ALL
-SELECT LAST_MONDAY_OF(DATE(CONCAT_WS('-',YEAR, 5, 1))) DAY, 'Memorial Day' EVENT, 'USA' calendar FROM year_source
-UNION ALL
-SELECT DATE(CONCAT_WS('-',YEAR, 5,5)) DAY, 'Cinco de Mayo' EVENT, 'USA' calendar FROM year_source
-UNION ALL
-SELECT IF (DAYOFWEEK(DATE(CONCAT_WS('-',YEAR, 7, 1))) = 1, 
-          DATE(CONCAT_WS('-',YEAR, 9, 2)), 
-          DATE(CONCAT_WS('-',YEAR, 9, 1))) DAY, 'Canada Day' EVENT, 'Canada' calendar FROM year_source
-UNION ALL
-SELECT DATE(CONCAT_WS('-',YEAR, 7,4)) DAY, 'Independence Day' EVENT, 'USA' calendar FROM year_source
-UNION ALL
-SELECT FIRST_MONDAY_OF(DATE(CONCAT_WS('-',YEAR, 9, 1))) DAY, 'Labor Day' EVENT, 'USA' calendar FROM year_source
-UNION ALL
-SELECT FIRST_MONDAY_OF(DATE(CONCAT_WS('-',YEAR, 10, 1))) + INTERVAL 1 WEEK DAY, 'Columbus Day' EVENT, 'USA' calendar FROM year_source
-UNION ALL
-SELECT FIRST_MONDAY_OF(DATE(CONCAT_WS('-',YEAR, 10, 1))) + INTERVAL 1 WEEK DAY, 'Thanksgiving Day' EVENT, 'Canada' calendar FROM year_source
-UNION ALL
-SELECT DATE(CONCAT_WS('-',YEAR, 11, 11)) DAY, 'Veterans'' Day' EVENT, 'USA' calendar FROM year_source
-UNION ALL
-SELECT FIRST_DAYOFWEEK_OF(DATE(CONCAT_WS('-',YEAR, 11, 1)), 5) + INTERVAL 3 WEEK DAY, 'Thanksgiving Day' EVENT, 'USA' calendar FROM year_source
-UNION ALL
-SELECT DATE(CONCAT_WS('-',YEAR, 12, 25)) DAY, 'Christmas Day' EVENT, 'USA' calendar FROM year_source
-UNION ALL
-SELECT DATE(CONCAT_WS('-',YEAR, 12, 25)) DAY, 'Christmas Day' EVENT, 'Canada' calendar FROM year_source
-UNION ALL
-SELECT DATE(CONCAT_WS('-',YEAR, 12, 31)) DAY, 'New Year''s Eve' EVENT, 'USA' calendar FROM year_source ;
-
-DROP TABLE IF EXISTS `seq_0_65535`;
-CREATE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW `seq_0_65535` AS SELECT A.N + 4*(B.N + 4*(C.N + 4*(D.N + 4*(E.N + 4*(F.N + 4*(G.N + 4*(H.N))))))) AS seq
-  FROM (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3) AS A
-  JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3) AS B
-  JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3) AS C
-  JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3) AS D
-  JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3) AS E
-  JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3) AS F
-  JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3) AS G
-  JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3) AS H ;
-
-DROP TABLE IF EXISTS `weekend_source`;
-CREATE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW `weekend_source` AS SELECT day,  year, 'Weekend' event, 'Weekend' calendar FROM day_source WHERE DAYOFWEEK(day) IN (1,7) ;
-
-DROP TABLE IF EXISTS `year_input`;
-CREATE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW `year_input` AS SELECT 1700 + (A.N + 4*(B.N + 5*(C.N + 5*(D.N)))) AS year
-  FROM (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 ) AS A
-  JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4) AS B
-  JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4) AS C
-  JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5) AS D ;
-
-DROP TABLE IF EXISTS `year_source`;
-CREATE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW `year_source` AS SELECT DATE(CONCAT_WS('-', year, 1,1)) day, year
-  FROM year_input ;
-
-/*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;
-/*!40014 SET FOREIGN_KEY_CHECKS=IF(@OLD_FOREIGN_KEY_CHECKS IS NULL, 1, @OLD_FOREIGN_KEY_CHECKS) */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+SELECT DATEFROMPARTS(year,1,6), 'Epiphany' EVENT, 'Christian (Western)' calendar FROM year_source 
+GO

@@ -1,0 +1,162 @@
+create or replace FUNCTION DATEFROMPARTS(yy IN number,
+                                         mm IN number,
+                                         dd IN number) RETURN date
+    DETERMINISTIC
+AS
+BEGIN
+    RETURN TO_DATE(yy || '-' || mm || '-' || dd, 'YYYY-MM-DD');
+END DATEFROMPARTS;
+/
+
+create or replace FUNCTION TO_DAYS(dt IN DATE) RETURN NUMBER
+    DETERMINISTIC
+AS
+BEGIN
+    RETURN TRUNC(364 + dt - DATE '0001-01-01');
+END TO_DAYS;
+/
+
+create or replace FUNCTION FROM_DAYS(dn IN NUMBER) RETURN DATE
+    DETERMINISTIC
+AS
+BEGIN
+    RETURN dn - 364 + DATE '0001-01-01';
+END FROM_DAYS;
+/
+
+create or replace FUNCTION TRUNC_YEAR(dt IN DATE) RETURN DATE
+    DETERMINISTIC
+AS
+BEGIN
+    RETURN TRUNC(dt, 'YEAR');
+END TRUNC_YEAR;
+/
+
+create or replace FUNCTION TRUNC_MONTH(dt IN DATE) RETURN DATE
+    DETERMINISTIC
+AS
+BEGIN
+    RETURN TRUNC(dt, 'MM');
+END TRUNC_MONTH;
+/
+
+create or replace FUNCTION TRUNC_DAYOFWEEK(datestamp IN DATE,
+                                           dayofweek IN INTEGER) RETURN DATE
+    DETERMINISTIC
+AS
+BEGIN
+    RETURN FROM_DAYS(TO_DAYS(datestamp) - MOD(TO_DAYS(datestamp) - dayofweek, 7));
+END TRUNC_DAYOFWEEK;
+/
+
+create or replace FUNCTION TRUNC_SUNDAY(
+    datestamp IN DATE) RETURN DATE
+    DETERMINISTIC
+AS
+BEGIN
+    RETURN FROM_DAYS(TO_DAYS(datestamp) - MOD(TO_DAYS(datestamp) - 1, 7));
+END TRUNC_SUNDAY;
+/
+
+create or replace FUNCTION TRUNC_MONDAY(
+    datestamp IN DATE) RETURN DATE
+    DETERMINISTIC
+AS
+BEGIN
+    RETURN FROM_DAYS(TO_DAYS(datestamp) - MOD(TO_DAYS(datestamp) - 2, 7));
+END TRUNC_MONDAY;
+/
+
+create or replace FUNCTION TRUNC_QUARTER(
+    datestamp IN DATE) RETURN DATE
+    DETERMINISTIC
+AS
+BEGIN
+    RETURN TRUNC(datestamp, 'Q');
+END TRUNC_QUARTER;
+/
+
+create or replace FUNCTION TRUNC_DAY(datestamp IN DATE) RETURN DATE
+    DETERMINISTIC
+AS
+BEGIN
+    RETURN TRUNC(datestamp);
+END TRUNC_DAY;
+/
+
+create or replace FUNCTION FIRST_DAYOFWEEK_OF(datestamp IN DATE, dayofweek IN INTEGER) RETURN DATE
+    DETERMINISTIC
+AS
+BEGIN
+    RETURN TRUNC_DAYOFWEEK((TRUNC_MONTH(datestamp) + 6), dayofweek);
+END FIRST_DAYOFWEEK_OF;
+/
+
+create or replace FUNCTION FIRST_MONDAY_OF(datestamp IN DATE) RETURN DATE
+    DETERMINISTIC
+AS
+BEGIN
+    RETURN FIRST_DAYOFWEEK_OF((TRUNC_MONTH(datestamp) + 6), 2);
+END FIRST_MONDAY_OF;
+/
+
+create or replace FUNCTION FIRST_SUNDAY_OF(datestamp IN DATE) RETURN DATE
+    DETERMINISTIC
+AS
+BEGIN
+    RETURN FIRST_DAYOFWEEK_OF((TRUNC_MONTH(datestamp) + 6), 1);
+END FIRST_SUNDAY_OF;
+/
+
+create or replace FUNCTION LAST_DAYOFWEEK_OF(datestamp IN DATE, dayofweek IN INTEGER) RETURN DATE
+    DETERMINISTIC
+AS
+BEGIN
+    RETURN TRUNC_DAYOFWEEK(LAST_DAY(datestamp), dayofweek);
+END LAST_DAYOFWEEK_OF;
+/
+
+create or replace FUNCTION LAST_MONDAY_OF(datestamp IN DATE) RETURN DATE
+    DETERMINISTIC
+AS
+BEGIN
+    RETURN LAST_DAYOFWEEK_OF(datestamp, 2);
+END LAST_MONDAY_OF;
+/
+
+create or replace FUNCTION LAST_SUNDAY_OF(datestamp IN DATE) RETURN DATE
+    DETERMINISTIC
+AS
+BEGIN
+    RETURN LAST_DAYOFWEEK_OF(datestamp, 1);
+END LAST_SUNDAY_OF;
+/
+
+create or replace FUNCTION TRUNC_HOUR(datestamp IN DATE) RETURN DATE
+    DETERMINISTIC
+AS
+BEGIN
+    RETURN TRUNC(datestamp, 'HH');
+END TRUNC_HOUR;
+/
+
+create or replace FUNCTION TRUNC_N_MINUTES(datestamp IN TIMESTAMP, n IN INT) RETURN TIMESTAMP
+    DETERMINISTIC
+AS
+BEGIN
+    RETURN TRUNC(datestamp, 'HH') +
+           ((EXTRACT(MINUTE FROM datestamp) -
+             MOD(EXTRACT(MINUTE FROM datestamp), n)) / 1440);
+END TRUNC_N_MINUTES;
+/
+
+create or replace FUNCTION TRUNC_N_HOURS(datestamp IN TIMESTAMP, n IN INT) RETURN TIMESTAMP
+    DETERMINISTIC
+AS
+BEGIN
+    RETURN TRUNC(datestamp) +
+           ((EXTRACT(HOUR FROM datestamp) -
+             MOD(EXTRACT(HOUR FROM datestamp), n)) / 24);
+END TRUNC_N_HOURS;
+/
+
