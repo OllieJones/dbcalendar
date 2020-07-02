@@ -6,13 +6,15 @@ FROM latest_us_counties
 WHERE county <> 'Unknown'
 ),
 rolling AS (
-   SELECT date, county, state, fips,
+   SELECT date, us_counties.county, us_counties.state, us_counties.fips,
           cases, 
           avg(cases) OVER (PARTITION BY state, county ORDER BY date ROWS BETWEEN 3 PRECEDING AND 3 FOLLOWING) as cases7,
           deaths,
-          avg(deaths) OVER (PARTITION BY state, county ORDER BY date ROWS BETWEEN 3 PRECEDING AND 3 FOLLOWING) as deaths7
+          avg(deaths) OVER (PARTITION BY state, county ORDER BY date ROWS BETWEEN 3 PRECEDING AND 3 FOLLOWING) as deaths7,
+          IF(popestimate >0,popestimate, -1) population
      FROM us_counties
-     WHERE county <> 'Unknown'
+     LEFT JOIN censuspop2 ON us_counties.fips = censuspop2.FIPS AND censuspop2.year = 2019
+     WHERE us_counties.county <> 'Unknown'
 ),
 deltas AS (
   SELECT date, county, state, fips,
@@ -21,7 +23,8 @@ deltas AS (
           cases7 - LAG(cases7) OVER (PARTITION BY county, state ORDER BY `date`) newcases,
           deaths,
           deaths7, 
-          deaths7 - LAG(deaths7) OVER (PARTITION BY county, state ORDER BY `date`) newdeaths
+          deaths7 - LAG(deaths7) OVER (PARTITION BY county, state ORDER BY `date`) newdeaths,
+          population
      FROM rolling
 ),  
 maxdeltas AS (
@@ -40,13 +43,17 @@ peaks AS (
 display AS (
 SELECT date, state, county, fips,
        ROUND(cases7,1) cases, ROUND(newcases, 1) newcases,
-       ROUND(deaths7,1) deaths, ROUND(newdeaths, 1) newdeaths       
+       ROUND(deaths7,1) deaths, ROUND(newdeaths, 1) newdeaths,
+       population,
+       newcases/population newcasedensity,
+       newdeaths/population newdeathdensity,
+       cases/population caseedensity,
+       deaths/population deathdensity             
         from peaks 
-WHERE deaths7 > 20 OR cases7 > 50
+WHERE deaths7 > 20 OR cases7 > 100
 ),
 choice AS (
   SELECT * from display 
    where date >= LAST_DAY(CURDATE()) + INTERVAL 1 DAY - INTERVAL 1 MONTH
 )
-SELECT * FROM choice ORDER BY newdeaths DESC
-
+SELECT * FROM choice   order by cases desc limit 50
