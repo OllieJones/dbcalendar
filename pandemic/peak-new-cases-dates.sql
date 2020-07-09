@@ -8,12 +8,14 @@ WHERE county <> 'Unknown'
 rolling AS (
    SELECT date, us_counties.county, us_counties.state, us_counties.fips,
           cases, 
-          avg(cases) OVER (PARTITION BY state, county ORDER BY date ROWS BETWEEN 3 PRECEDING AND 3 FOLLOWING) as cases7,
+          avg(cases) OVER (PARTITION BY state, county ORDER BY date ROWS BETWEEN 6 PRECEDING AND 0 FOLLOWING) as cases7,
           deaths,
-          avg(deaths) OVER (PARTITION BY state, county ORDER BY date ROWS BETWEEN 3 PRECEDING AND 3 FOLLOWING) as deaths7,
-          IF(popestimate >0,popestimate, -1) population
+          avg(deaths) OVER (PARTITION BY state, county ORDER BY date ROWS BETWEEN 6 PRECEDING AND 0 FOLLOWING) as deaths7,
+          IF(popestimate >0,popestimate, -1) population,
+          IF(areas.LandArea > 0, popestimate / areas.LandArea, 0) popdensity
      FROM us_counties
      LEFT JOIN censuspop2 ON us_counties.fips = censuspop2.FIPS AND censuspop2.year = 2019
+     LEFT JOIN areas ON us_counties.fips = areas.fips
      WHERE us_counties.county <> 'Unknown'
 ),
 deltas AS (
@@ -24,7 +26,8 @@ deltas AS (
           deaths,
           deaths7, 
           deaths7 - LAG(deaths7) OVER (PARTITION BY county, state ORDER BY `date`) newdeaths,
-          population
+          population,
+          popdensity
      FROM rolling
 ),  
 maxdeltas AS (
@@ -45,6 +48,7 @@ SELECT date, state, county, fips,
        ROUND(cases7,1) cases, ROUND(newcases, 1) newcases,
        ROUND(deaths7,1) deaths, ROUND(newdeaths, 1) newdeaths,
        population,
+       ROUND (popdensity,0) popdensity,
        newcases/population newcasedensity,
        newdeaths/population newdeathdensity,
        cases/population caseedensity,
@@ -54,6 +58,6 @@ WHERE deaths7 > 20 OR cases7 > 100
 ),
 choice AS (
   SELECT * from display 
-   where date >= LAST_DAY(CURDATE()) + INTERVAL 1 DAY - INTERVAL 1 MONTH
+   where date >= LAST_DAY(CURDATE()) + INTERVAL 1 DAY - INTERVAL 2 MONTH
 )
-SELECT * FROM choice   order by cases desc limit 50
+SELECT * FROM choice  order by popdensity desc
